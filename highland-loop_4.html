@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Highland Ministries – Video Loop</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #000;
+      color: #fff;
+      font-family: Georgia, serif;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #container iframe {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100% !important;
+      height: 100% !important;
+      border: none;
+    }
+
+    #hud {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 40px;
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.7);
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+    }
+
+    #hud.hidden { opacity: 0; }
+
+    .dot-track { display: flex; gap: 7px; align-items: center; }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      transition: background 0.3s, transform 0.3s;
+    }
+
+    .dot.active {
+      background: #fff;
+      transform: scale(1.3);
+    }
+
+    #status { color: rgba(255,255,255,0.5); }
+  </style>
+</head>
+<body>
+
+<div id="container"></div>
+
+<div id="hud">
+  <div class="dot-track" id="dots"></div>
+  <span id="status">Loading…</span>
+</div>
+
+<script>
+  const VIDEOS = [
+    'https://vimeo.com/1102791324/d9a7774d53',
+    'https://vimeo.com/1109339916/910eb1517d',
+    'https://vimeo.com/1178553435/2751c4c400',
+    'https://vimeo.com/1105225734/e7e78517e6'
+  ];
+
+  let currentIndex = 0;
+  let player = null;
+  let hudTimer = null;
+
+  const container = document.getElementById('container');
+  const hud       = document.getElementById('hud');
+  const status    = document.getElementById('status');
+  const dotsEl    = document.getElementById('dots');
+
+  VIDEOS.forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i === 0 ? ' active' : '');
+    dotsEl.appendChild(d);
+  });
+
+  function updateDots(idx) {
+    document.querySelectorAll('.dot').forEach((d, i) => {
+      d.classList.toggle('active', i === idx);
+    });
+  }
+
+  function showHud(msg) {
+    status.textContent = msg;
+    hud.classList.remove('hidden');
+    clearTimeout(hudTimer);
+    hudTimer = setTimeout(() => hud.classList.add('hidden'), 3500);
+  }
+
+  function loadVideo(idx) {
+    currentIndex = idx;
+    updateDots(idx);
+    showHud(`Video ${idx + 1} of ${VIDEOS.length}`);
+
+    const go = () => {
+      container.innerHTML = '';
+      createPlayer(idx);
+    };
+
+    if (player) {
+      player.destroy().catch(() => {}).finally(go);
+    } else {
+      go();
+    }
+  }
+
+  function createPlayer(idx) {
+    player = new Vimeo.Player(container, {
+      url: VIDEOS[idx],
+      width: window.innerWidth,
+      autoplay: true,
+      autopause: false,
+      badge: false,
+      title: false,
+      byline: false,
+      portrait: false
+    });
+
+    player.on('ended', () => {
+      const next = (currentIndex + 1) % VIDEOS.length;
+      showHud(next === 0 ? 'Restarting loop…' : `Up next: video ${next + 1}`);
+      setTimeout(() => loadVideo(next), 1200);
+    });
+
+    player.on('error', (err) => {
+      console.warn('Vimeo error:', err);
+      showHud('Playback error — check console');
+      hud.classList.remove('hidden');
+    });
+  }
+
+  function loadVimeoSDK(callback) {
+    if (window.Vimeo) { callback(); return; }
+    const script = document.createElement('script');
+    script.src = 'https://player.vimeo.com/api/player.js';
+    script.onload = callback;
+    script.onerror = () => {
+      status.textContent = 'Failed to load Vimeo SDK – check internet connection';
+      hud.classList.remove('hidden');
+    };
+    document.head.appendChild(script);
+  }
+
+  loadVimeoSDK(() => loadVideo(0));
+
+  document.addEventListener('click', () => hud.classList.toggle('hidden'));
+</script>
+</body>
+</html>
